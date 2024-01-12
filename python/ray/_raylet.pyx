@@ -3812,7 +3812,8 @@ cdef class CoreWorker:
                     scheduling_strategy,
                     c_string debugger_breakpoint,
                     c_string serialized_runtime_env_info,
-                    int64_t generator_backpressure_num_objects
+                    int64_t generator_backpressure_num_objects,
+                    c_bool auto_num_gpus
                     ):
         cdef:
             unordered_map[c_string, double] c_resources
@@ -3845,7 +3846,8 @@ cdef class CoreWorker:
                 name, num_returns, c_resources,
                 b"",
                 generator_backpressure_num_objects,
-                serialized_runtime_env_info)
+                serialized_runtime_env_info,
+                auto_num_gpus)
 
             current_c_task_id = current_task.native()
 

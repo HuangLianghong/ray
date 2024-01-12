@@ -489,6 +489,8 @@ class TaskSpecification : public MessageWrapper<rpc::TaskSpec> {
 
   void EmitTaskMetrics() const;
 
+  bool AutoNumGPUs() const;
+
  private:
   void ComputeResources();
 

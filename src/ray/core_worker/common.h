@@ -66,13 +66,15 @@ struct TaskOptions {
               std::unordered_map<std::string, double> &resources,
               const std::string &concurrency_group_name = "",
               int64_t generator_backpressure_num_objects = -1,
-              const std::string &serialized_runtime_env_info = "{}")
+              const std::string &serialized_runtime_env_info = "{}",
+              bool auto_num_gpus = false)
       : name(name),
         num_returns(num_returns),
         resources(resources),
         concurrency_group_name(concurrency_group_name),
         serialized_runtime_env_info(serialized_runtime_env_info),
-        generator_backpressure_num_objects(generator_backpressure_num_objects) {}
+        generator_backpressure_num_objects(generator_backpressure_num_objects),
+        auto_num_gpus(auto_num_gpus){}
 
   /// The name of this task.
   std::string name;
@@ -90,6 +92,7 @@ struct TaskOptions {
   /// -1 means either streaming generator is not used or
   /// it is used but the feature is disabled.
   int64_t generator_backpressure_num_objects;
+  bool auto_num_gpus;
 };
 
 /// Options for actor creation tasks.

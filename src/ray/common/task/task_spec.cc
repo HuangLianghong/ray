@@ -462,6 +462,7 @@ bool TaskSpecification::IsAsyncioActor() const {
 bool TaskSpecification::IsDetachedActor() const {
   return IsActorCreationTask() && message_->actor_creation_task_spec().is_detached();
 }
+bool TaskSpecification::AutoNumGPUs() const { return message_->auto_num_gpus(); }
 
 std::string TaskSpecification::DebugString() const {
   std::ostringstream stream;
@@ -486,7 +487,8 @@ std::string TaskSpecification::DebugString() const {
   stream << ", task_id=" << TaskId() << ", task_name=" << GetName()
          << ", job_id=" << JobId() << ", num_args=" << NumArgs()
          << ", num_returns=" << NumReturns() << ", max_retries=" << MaxRetries()
-         << ", depth=" << GetDepth() << ", attempt_number=" << AttemptNumber();
+         << ", depth=" << GetDepth() << ", attempt_number=" << AttemptNumber()
+         << ", auto_num_gpus="<< AutoNumGPUs();
 
   if (IsActorCreationTask()) {
     // Print actor creation task spec.

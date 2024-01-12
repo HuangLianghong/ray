@@ -212,3 +212,7 @@ try-import %workspace%/.llvm-local.bazelrc
 build:macos --sandbox_block_path=/usr/local/
 # This option controls whether javac checks for missing direct dependencies.
 build --experimental_strict_java_deps=off
+# Limit the resource used for compilation, in order not to cause server lag
+build --local_ram_resources=HOST_RAM*.2 --local_cpu_resources=8
+# Cache to speed up repeated build
+# build --disk_cache=~/bazel-cache

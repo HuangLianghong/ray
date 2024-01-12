@@ -69,6 +69,8 @@ bool LocalTaskManager::WaitForTaskArgsRequests(std::shared_ptr<internal::Work> w
   const auto &scheduling_key = task.GetTaskSpecification().GetSchedulingClass();
   auto object_ids = task.GetTaskSpecification().GetDependencies();
   bool can_dispatch = true;
+  RAY_LOG(DEBUG) << "task.GetTaskSpecification().AutoNumGPUs(): "
+                     << task.GetTaskSpecification().AutoNumGPUs();
   if (object_ids.size() > 0) {
     bool args_ready = task_dependency_manager_.RequestTaskDependencies(
         task_id,

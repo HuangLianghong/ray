@@ -366,6 +366,7 @@ class RemoteFunction:
             _warn_if_using_deprecated_placement_group(task_options, 4)
 
         resources = ray._private.utils.resources_from_ray_options(task_options)
+        auto_num_gpus = task_options["auto_num_gpus"]
 
         if scheduling_strategy is None or isinstance(
             scheduling_strategy, PlacementGroupSchedulingStrategy
@@ -439,6 +440,7 @@ class RemoteFunction:
                 worker.debugger_breakpoint,
                 serialized_runtime_env_info or "{}",
                 generator_backpressure_num_objects,
+                auto_num_gpus,
             )
             # Reset worker's debug context from the last "remote" command
             # (which applies only to this .remote call).

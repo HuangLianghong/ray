@@ -1952,10 +1952,11 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
                                              next_task_index);
   auto constrained_resources =
       AddPlacementGroupConstraint(task_options.resources, scheduling_strategy);
-
+  
   auto task_name = task_options.name.empty()
                        ? function.GetFunctionDescriptor()->DefaultTaskName()
                        : task_options.name;
+  bool auto_num_gpus= task_options.auto_num_gpus;
   int64_t depth = worker_context_.GetTaskDepth() + 1;
   // TODO(ekl) offload task building onto a thread pool for performance
   BuildCommonTaskSpec(builder,
@@ -1984,7 +1985,8 @@ std::vector<rpc::ObjectReference> CoreWorker::SubmitTask(
   builder.SetNormalTaskSpec(max_retries,
                             retry_exceptions,
                             serialized_retry_exception_allowlist,
-                            scheduling_strategy);
+                            scheduling_strategy,
+                            auto_num_gpus);
   TaskSpecification task_spec = builder.Build();
   RAY_LOG(DEBUG) << "Submitting normal task " << task_spec.DebugString();
   std::vector<rpc::ObjectReference> returned_refs;

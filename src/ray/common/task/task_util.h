@@ -170,12 +170,14 @@ class TaskSpecBuilder {
       int max_retries,
       bool retry_exceptions,
       const std::string &serialized_retry_exception_allowlist,
-      const rpc::SchedulingStrategy &scheduling_strategy) {
+      const rpc::SchedulingStrategy &scheduling_strategy,
+      bool auto_num_gpus=false) {
     message_->set_max_retries(max_retries);
     message_->set_retry_exceptions(retry_exceptions);
     message_->set_serialized_retry_exception_allowlist(
         serialized_retry_exception_allowlist);
     message_->mutable_scheduling_strategy()->CopyFrom(scheduling_strategy);
+    message_->set_auto_num_gpus(auto_num_gpus);
     return *this;
   }
 
