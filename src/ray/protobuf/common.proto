@@ -668,6 +668,8 @@ message ActorCreationTaskSpec {
   bool execute_out_of_order = 14;
   // The max number of pending actor calls.
   int32 max_pending_calls = 15;
+  // Whether to change 'num_gpus' automatically.
+  bool auto_num_gpus = 16;
 }
 
 // Task spec of an actor task.

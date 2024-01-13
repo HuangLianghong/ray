@@ -112,7 +112,8 @@ struct ActorCreationOptions {
                        const std::string &serialized_runtime_env_info = "{}",
                        const std::vector<ConcurrencyGroup> &concurrency_groups = {},
                        bool execute_out_of_order = false,
-                       int32_t max_pending_calls = -1)
+                       int32_t max_pending_calls = -1,
+                       bool auto_num_gpus=false)
       : max_restarts(max_restarts),
         max_task_retries(max_task_retries),
         max_concurrency(max_concurrency),
@@ -128,7 +129,8 @@ struct ActorCreationOptions {
         concurrency_groups(concurrency_groups.begin(), concurrency_groups.end()),
         execute_out_of_order(execute_out_of_order),
         max_pending_calls(max_pending_calls),
-        scheduling_strategy(scheduling_strategy) {
+        scheduling_strategy(scheduling_strategy),
+        auto_num_gpus(auto_num_gpus) {
     // Check that resources is a subset of placement resources.
     for (auto &resource : resources) {
       auto it = this->placement_resources.find(resource.first);
@@ -180,6 +182,7 @@ struct ActorCreationOptions {
   const int max_pending_calls = -1;
   // The strategy about how to schedule this actor.
   rpc::SchedulingStrategy scheduling_strategy;
+  bool auto_num_gpus=false;
 };
 
 using PlacementStrategy = rpc::PlacementStrategy;

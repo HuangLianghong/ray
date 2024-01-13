@@ -230,7 +230,8 @@ class TaskSpecBuilder {
       bool is_asyncio = false,
       const std::vector<ConcurrencyGroup> &concurrency_groups = {},
       const std::string &extension_data = "",
-      bool execute_out_of_order = false) {
+      bool execute_out_of_order = false,
+      bool auto_num_gpus = false) {
     message_->set_type(TaskType::ACTOR_CREATION_TASK);
     auto actor_creation_spec = message_->mutable_actor_creation_task_spec();
     actor_creation_spec->set_actor_id(actor_id.Binary());
@@ -246,6 +247,7 @@ class TaskSpecBuilder {
     actor_creation_spec->set_is_asyncio(is_asyncio);
     actor_creation_spec->set_extension_data(extension_data);
     actor_creation_spec->set_serialized_actor_handle(serialized_actor_handle);
+    actor_creation_spec->set_auto_num_gpus(auto_num_gpus);
     for (const auto &concurrency_group : concurrency_groups) {
       rpc::ConcurrencyGroup *group = actor_creation_spec->add_concurrency_groups();
       group->set_name(concurrency_group.name);

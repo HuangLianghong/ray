@@ -4,8 +4,10 @@ from torchvision.models import resnet18,resnet152,vgg19
 from inference_actor import Predictor
 from torch.utils.data import DataLoader, Subset
 import ray
+import time
 import argparse
 if __name__ == "__main__":
+    ray.init(_temp_dir="/mnt/sda/2022-0526/home/hlh/ray-log-files/")
     model = vgg19()
     model_ref = ray.put(model)
     num_actors = 1

@@ -3813,7 +3813,7 @@ cdef class CoreWorker:
                     c_string debugger_breakpoint,
                     c_string serialized_runtime_env_info,
                     int64_t generator_backpressure_num_objects,
-                    c_bool auto_num_gpus
+                    c_bool auto_num_gpus,
                     ):
         cdef:
             unordered_map[c_string, double] c_resources
@@ -3892,6 +3892,7 @@ cdef class CoreWorker:
                      concurrency_groups_dict,
                      int32_t max_pending_calls,
                      scheduling_strategy,
+                     c_bool auto_num_gpus,
                      ):
         cdef:
             CRayFunction ray_function
@@ -3938,7 +3939,8 @@ cdef class CoreWorker:
                         # execute out of order for
                         # async or threaded actors.
                         is_asyncio or max_concurrency > 1,
-                        max_pending_calls),
+                        max_pending_calls,
+                        auto_num_gpus),
                     extension_data,
                     &c_actor_id)
 

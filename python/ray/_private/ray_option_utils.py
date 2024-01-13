@@ -145,6 +145,10 @@ _common_options = {
             NodeLabelSchedulingStrategy,
         )
     ),
+    "auto_num_gpus": Option(
+        bool,
+        default_value=False,
+    ),
     "_metadata": Option((dict, type(None))),
 }
 
@@ -209,10 +213,7 @@ _task_only_options = {
             "whenever `next` is called). Use -1 to disable this feature. "
         ),
     ),
-    "auto_num_gpus": Option(
-        bool,
-        default_value=False,
-    ),
+   
 }
 
 _actor_only_options = {

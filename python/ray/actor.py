@@ -951,7 +951,7 @@ class ActorClass:
         max_restarts = actor_options["max_restarts"]
         max_task_retries = actor_options["max_task_retries"]
         max_pending_calls = actor_options["max_pending_calls"]
-
+        auto_num_gpus = actor_options["auto_num_gpus"]
         if scheduling_strategy is None or not isinstance(
             scheduling_strategy, PlacementGroupSchedulingStrategy
         ):
@@ -1149,6 +1149,7 @@ class ActorClass:
             concurrency_groups_dict=concurrency_groups_dict or dict(),
             max_pending_calls=max_pending_calls,
             scheduling_strategy=scheduling_strategy,
+            auto_num_gpus=auto_num_gpus,
         )
 
         if _actor_launch_hook:
