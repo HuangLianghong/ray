@@ -7,7 +7,7 @@ from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader, Subset
 
 
-@ray.remote(num_gpus=1)
+@ray.remote(num_gpus=1,auto_num_gpus=True)
 class Predictor:
     def __init__(self, model):
         torch.cuda.is_available()
@@ -20,8 +20,32 @@ class Predictor:
                 transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             ]
         )
+    def test(self):
+        print('Test whether this method can be call by the proxy_actor...')
+        # raise Exception('Call the method in remote actor!')
 
-        
+    def profile(self):
+        """
+        This method is used to profile the GPU resources that this actor needs.
+        """
+        data_dir = "~/data_ArRay"
+        data_dir=os.path.expanduser(data_dir)
+        os.makedirs(data_dir, exist_ok=True)
+        with FileLock(os.path.join(data_dir, ".ray.lock")):
+            validation_dataset = CIFAR10(
+                root=data_dir, train=True, download=True, transform=self.transform_test
+            )
+        validation_loader = DataLoader(validation_dataset, batch_size=128)   
+        result=[]
+        with torch.no_grad():
+            for X, _ in validation_loader:
+                X=X.cuda()
+                result.append(self.model(X))
+
+
+
+        return
+    
     def predict(self, data_dir):
         data_dir=os.path.expanduser(data_dir)
         os.makedirs(data_dir, exist_ok=True)

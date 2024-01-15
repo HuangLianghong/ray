@@ -1,3 +1,6 @@
+import GPUtil
+from threading import Thread
+import time
 import inspect
 import logging
 import weakref
@@ -693,6 +696,10 @@ class ActorClass:
         Returns:
             A handle to the newly created actor.
         """
+        require_auto_tune = self._default_options.get("auto_num_gpus")
+        if require_auto_tune:
+            self.auto_configure(args=args, kwargs=kwargs, **self._default_options)
+
         return self._remote(args=args, kwargs=kwargs, **self._default_options)
 
     def options(self, **actor_options):
@@ -823,6 +830,50 @@ class ActorClass:
                 )
 
         return ActorOptionWrapper()
+    
+
+    def create_proxy_actor(self,args=None, kwargs=None, **actor_options):
+        """
+        Generate a proxy actor from the original actor, we don't create the real
+        actor until profling the proxy actor and reconfiguration
+        """
+
+        return self._remote(args=args, kwargs=kwargs, **actor_options)
+
+    def profile_proxy(self, proxy_actor):
+        """
+        Run the specific method in the proxy method and collect the relative metrics.
+        And decide a best 'num_gpus' for the real actor.
+        """
+        if not 'profile' in proxy_actor._ray_method_signatures:
+            raise Exception('There should be a method name \'profile\' in remote actor'
+                             'when \'auto_num_gpus=True\'')
+        
+        monitor = Monitor(0.5)
+        if 'profile' in proxy_actor._ray_method_signatures:
+            ray.get(proxy_actor.profile.remote())
+
+        monitor.stop()
+
+        del proxy_actor
+        return monitor.gpu_util, monitor.memory_usage
+    
+    def calculate_num_gpus(self, gpu_util, memory_usage):
+        """
+        Calculate an appropriate 'num_gpus' based on profile_results.
+        """
+        print (gpu_util)
+        print (memory_usage)
+
+        return
+    
+    def auto_configure(self,args=None, kwargs=None, **actor_options):
+        auto_num_gpus = actor_options["auto_num_gpus"]
+        if not auto_num_gpus:
+            return
+        proxy_actor = self.create_proxy_actor(args, kwargs, **actor_options)
+        gpu_util, memory_usage = self.profile_proxy(proxy_actor)
+        new_num_gpus = self.calculate_num_gpus(gpu_util, memory_usage)
 
     @wrap_auto_init
     @_tracing_actor_creation
@@ -1653,3 +1704,30 @@ def exit_actor():
             f"{worker.mode}. Call this API inside an actor methods"
             "if you'd like to exit the actor gracefully."
         )
+
+class Monitor(Thread):
+    # Cannot get the gpu states during profiling
+    def __init__(self, delay):
+        super(Monitor, self).__init__()
+        self.stopped = False
+        self.delay = delay # Time-second between calls to GPUtil
+        self.gpus=GPUtil.getGPUs()
+        self.gpu_util=[[] for i in range(len(self.gpus))]  
+        self.memory_usage= [0] * len(self.gpus)
+        self.start()
+        for gpu in self.gpus:
+            print("GPU RAM Free: {0:.0f}MB | Used: {1:.0f}MB | Util {2:3.0f}% | Total {3:.0f}MB"\
+                  .format(gpu.memoryFree, gpu.memoryUsed, gpu.memoryUtil*100, gpu.memoryTotal))
+
+    def run(self):
+        while not self.stopped:
+            for i in range(len(self.gpus)):
+                self.gpu_util[i].append(self.gpus[i].load)
+                if self.gpus[i].memoryUtil > self.memory_usage[i]:
+                    self.memory_usage[i] = self.gpus[i].memoryUtil
+            time.sleep(self.delay)
+
+    def stop(self):
+        self.stopped = True
+
+    
