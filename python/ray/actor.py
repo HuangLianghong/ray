@@ -698,6 +698,8 @@ class ActorClass:
         """
         require_auto_tune = self._default_options.get("auto_num_gpus")
         if require_auto_tune:
+            # for key in kwargs:
+            #     print(f"key = {key}, value = {kwargs[key]}")
             self.auto_configure(args=args, kwargs=kwargs, **self._default_options)
 
         return self._remote(args=args, kwargs=kwargs, **self._default_options)
@@ -840,40 +842,96 @@ class ActorClass:
 
         return self._remote(args=args, kwargs=kwargs, **actor_options)
 
-    def profile_proxy(self, proxy_actor):
+    def profile_proxy(self, proxy_actor, batch_size):
         """
         Run the specific method in the proxy method and collect the relative metrics.
         And decide a best 'num_gpus' for the real actor.
+        
+        RETURN: gpu utilization and duration time under different batch size
         """
         if not 'profile' in proxy_actor._ray_method_signatures:
             raise Exception('There should be a method name \'profile\' in remote actor'
                              'when \'auto_num_gpus=True\'')
         
-        monitor = Monitor(0.5)
-        if 'profile' in proxy_actor._ray_method_signatures:
-            ray.get(proxy_actor.profile.remote())
+        
+        duration_time = []
 
+        monitor = Monitor(0.1)
+        if 'profile' in proxy_actor._ray_method_signatures:
+            ray.get(proxy_actor.profile.remote(batch_size))
         monitor.stop()
+        avg_gpu_util=monitor.avg_util
+        duration_time=monitor.duration
+
 
         del proxy_actor
-        return monitor.gpu_util, monitor.memory_usage
+        # list, float
+        return avg_gpu_util, duration_time
     
-    def calculate_num_gpus(self, gpu_util, memory_usage):
+    def calculate_num_gpus(self, gpu_utils, duration_times, batch_sizes):
         """
         Calculate an appropriate 'num_gpus' based on profile_results.
         """
-        print (gpu_util)
-        print (memory_usage)
+        print (f"GPU Utilization: {gpu_utils}")
+        print(f"Duration Time: {duration_times}")
 
-        return
+        duration_vs_gpuutil = []
+        normalized_gpu_util = gpu_utils
+        normalized_duration_times = duration_times
     
+        # Calculate the most cost-effective setting
+        # Normalized duration time / normalized avg gpu utilzation
+        for i in range(len(gpu_utils)):
+            # normalized_gpu_util[i][2] = normalized_gpu_util[i][2]/gpu_utils[0][2]
+            # normalized_duration_times[i] = normalized_duration_times[i]/duration_times[0]
+            """
+            For gpu_utils[i][j], j is the actual index of physical GPU
+            """
+            duration_vs_gpuutil.append(duration_times[i]/(1/gpu_utils[i][2]))
+        
+        min_idx = duration_vs_gpuutil.index(min(duration_vs_gpuutil))
+        best_batch_size = batch_sizes[min_idx]
+        best_num_gpus = gpu_utils[min_idx][2]
+        print (f"duration_vs_gpuutil: {duration_vs_gpuutil}")
+        print (f"Best Batch Size: {best_batch_size}")
+
+        return  best_num_gpus, best_batch_size
+    
+    def generate_powers_of_two(self,start, end):
+        result = []
+        current_num = start
+
+        while current_num <= end:
+            result.append(current_num)
+            current_num *= 2
+
+        return result
+
     def auto_configure(self,args=None, kwargs=None, **actor_options):
         auto_num_gpus = actor_options["auto_num_gpus"]
         if not auto_num_gpus:
             return
-        proxy_actor = self.create_proxy_actor(args, kwargs, **actor_options)
-        gpu_util, memory_usage = self.profile_proxy(proxy_actor)
-        new_num_gpus = self.calculate_num_gpus(gpu_util, memory_usage)
+        else :
+            bs_range = actor_options["bs_range"]
+            if bs_range is None or len(bs_range) != 2:
+                raise ValueError("When auto_num_gpus is True, bs_range must be set like [start,end]")
+        # batch_sizes = [64,128,256,512,1024,2048,4096]
+        # batch_sizes = [1,2,4,8,16,32,64,128,256,512]
+        # print(f"start batch size:{bs_range[0]}")
+        # print(f"end batch size:{bs_range[1]}")
+        batch_sizes = self.generate_powers_of_two(bs_range[0], bs_range[1])
+        print(f"Batch sizes for profiling:{batch_sizes}")
+        # batch_sizes = [1,32,64,128]
+        duration_times = []
+        # 2-dim list
+        gpu_utils = []
+        for batch_size in batch_sizes:
+            proxy_actor = self.create_proxy_actor(args, kwargs, **actor_options)
+            avg_gpu_util,duration_time= self.profile_proxy(proxy_actor,batch_size)
+            duration_times.append(duration_time)
+            gpu_utils.append(avg_gpu_util)
+
+        new_num_gpus, new_batch_size = self.calculate_num_gpus(gpu_utils, duration_times, batch_sizes)
 
     @wrap_auto_init
     @_tracing_actor_creation
@@ -1706,28 +1764,44 @@ def exit_actor():
         )
 
 class Monitor(Thread):
-    # Cannot get the gpu states during profiling
+
     def __init__(self, delay):
         super(Monitor, self).__init__()
         self.stopped = False
         self.delay = delay # Time-second between calls to GPUtil
         self.gpus=GPUtil.getGPUs()
-        self.gpu_util=[[] for i in range(len(self.gpus))]  
+        self.gpu_util=[0] * len(self.gpus)
         self.memory_usage= [0] * len(self.gpus)
+        self.start_time=-1
+        self.avg_util = [0] * len(self.gpus)
+        self.end_time=-1
+        self.duration=1
+        self.count = [0] * len(self.gpus)
         self.start()
-        for gpu in self.gpus:
-            print("GPU RAM Free: {0:.0f}MB | Used: {1:.0f}MB | Util {2:3.0f}% | Total {3:.0f}MB"\
-                  .format(gpu.memoryFree, gpu.memoryUsed, gpu.memoryUtil*100, gpu.memoryTotal))
-
+        
     def run(self):
+        self.start_time = time.time()
         while not self.stopped:
+            self.gpus=GPUtil.getGPUs()
+            
             for i in range(len(self.gpus)):
-                self.gpu_util[i].append(self.gpus[i].load)
-                if self.gpus[i].memoryUtil > self.memory_usage[i]:
-                    self.memory_usage[i] = self.gpus[i].memoryUtil
+                if self.gpus[i].load != 0:
+                    self.gpu_util[i] += self.gpus[i].load
+                    self.count[i] += 1
+                # if self.gpus[i].load > self.gpu_util[i]:
+                #     self.gpu_util[i] = self.gpus[i].load
+                # if self.gpus[i].memoryUtil > self.memory_usage[i]:
+                #     self.memory_usage[i] = self.gpus[i].memoryUtil
             time.sleep(self.delay)
 
     def stop(self):
         self.stopped = True
+        self.end_time =time.time()
+        self.duration = self.end_time-self.start_time
+        for i in range(len(self.gpus)):
+            if self.count[i] != 0:
+                self.avg_util[i] = self.gpu_util[i]/self.count[i]
+            else:
+                self.avg_util[i] = self.gpu_util[i]
 
     

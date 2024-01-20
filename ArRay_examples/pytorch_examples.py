@@ -6,18 +6,16 @@ from ray.util.actor_pool import ActorPool
 from torchvision.datasets import CIFAR10
 from torchvision.models import resnet18,resnet152,vgg19,vit_h_14,resnet50,swin_v2_b, swin_v2_s,mobilenet_v3_small
 from torchvision.models import convnext_large,squeezenet1_1,vit_l_16,vit_b_16
-from inference_actor import Predictor
+from pytroch_inference_actor import Predictor
 from torch.utils.data import DataLoader, Subset
 import matplotlib.pyplot as plt
 import numpy as np
-import ray
+
 import time
 import argparse
 if __name__ == "__main__":
-    ray.init(_temp_dir="/mnt/sda/2022-0526/home/hlh/ray-log-files/")
     model =resnet50()
-    model_ref = ray.put(model)
-    batch_sizes = [64,128,256,512,1024,2048,4096]
+    batch_sizes = [512]
     # batch_sizes = [1,2,4,8,16,32]
     num_actors = len(batch_sizes)
 
@@ -26,18 +24,19 @@ if __name__ == "__main__":
     bsizes=[]
 
     for i in range(0,num_actors):
-        actor = Predictor.remote(model_ref)
+        actor = Predictor(model)
         start = time.time()
-        ref = actor.predict.remote("~/data_ArRay",batch_sizes[i])
-        bs, gpu_util=ray.get(ref)
+        bs, gpu_util = actor.predict("~/data_ArRay",batch_sizes[i])
         end =time.time()
         times.append(end-start)
         gpu_utils.append(gpu_util)
         bsizes.append(bs)
+        print(f"Duration: {end-start}")
+        print(f"GPU_Util: {gpu_util}")
 
-        ray.kill(actor)
 
 
+"""
     # 构建数据
     x = [str(x) for x in bsizes]
     y = gpu_utils
@@ -73,3 +72,4 @@ if __name__ == "__main__":
     plt.savefig('./figure/resnet50-profile.svg', bbox_inches='tight')
     # 显示图片
     plt.show()
+"""

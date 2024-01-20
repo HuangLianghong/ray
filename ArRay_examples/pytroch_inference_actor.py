@@ -1,5 +1,7 @@
+"""
+Profile this example to find out the reason about the variation of gpu_util and duration time 
+"""
 import torch
-import ray
 import os
 import time
 import GPUtil
@@ -10,7 +12,6 @@ from torch.utils.data import DataLoader, Subset
 from threading import Thread
 
 
-@ray.remote(num_gpus=1,auto_num_gpus=True, bs_range=[1,4])
 class Predictor:
     def __init__(self, model):
         torch.cuda.is_available()
@@ -21,7 +22,8 @@ class Predictor:
             [
                 transforms.ToTensor(),
                 transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-                # transforms.Resize(224,antialias=True) # for  vit_h_14()
+                transforms.Resize(224,antialias=True) # for  vit_h_14()
+
             ]
         )
     def test(self):
@@ -58,12 +60,13 @@ class Predictor:
                 root=data_dir, train=True, download=True, transform=self.transform_test
             )
         # validation_loader = DataLoader(validation_dataset, batch_size=batch_size) 
-
-        validation_loader = DataLoader(validation_dataset, batch_size=batch_size)
+        subset_size=25600
+        subset = Subset(validation_dataset,range(subset_size))
+        validation_loader = DataLoader(subset, batch_size=batch_size)
 
         result=[]
         
-        monitor = Monitor(0.05)
+        monitor = Monitor(0.1)
         with torch.no_grad():
             for X, _ in validation_loader:
                 X=X.cuda()
@@ -78,7 +81,7 @@ class Predictor:
         # ...
 
         # Here we just return the size about the result in this example.
-        return batch_size, monitor.gpu_util[2]
+        return batch_size, monitor.avg_util[2]
     
 class Monitor(Thread):
 
@@ -88,21 +91,35 @@ class Monitor(Thread):
         self.delay = delay # Time-second between calls to GPUtil
         self.gpus=GPUtil.getGPUs()
         self.gpu_util=[0] * len(self.gpus)
-        self.count=0
-        # self.memory_usage= [0] * len(self.gpus)
+        self.memory_usage= [0] * len(self.gpus)
+        self.start_time=-1
+        self.avg_util = [0] * len(self.gpus)
+        self.end_time=-1
+        self.duration=1
+        self.count = [0] * len(self.gpus)
         self.start()
         
     def run(self):
+        self.start_time = time.time()
         while not self.stopped:
             self.gpus=GPUtil.getGPUs()
-            self.count += 1
+            
             for i in range(len(self.gpus)):
-                if self.gpus[i].load>self.gpu_util[i]:
-                    self.gpu_util[i] = self.gpus[i].load
+                if self.gpus[i].load != 0:
+                    self.gpu_util[i] += self.gpus[i].load
+                    self.count[i] += 1
+                # if self.gpus[i].load > self.gpu_util[i]:
+                #     self.gpu_util[i] = self.gpus[i].load
                 # if self.gpus[i].memoryUtil > self.memory_usage[i]:
                 #     self.memory_usage[i] = self.gpus[i].memoryUtil
             time.sleep(self.delay)
 
-
     def stop(self):
         self.stopped = True
+        self.end_time =time.time()
+        self.duration = self.end_time-self.start_time
+        for i in range(len(self.gpus)):
+            if self.count[i] != 0:
+                self.avg_util[i] = self.gpu_util[i]/self.count[i]
+            else:
+                self.avg_util[i] = self.gpu_util[i]

@@ -17,6 +17,11 @@
 /dashboard/client/build
 /.whl
 
+# Ignore example figure
+ArRay_examples/figure/
+# Ignore nsys files
+ArRay_examples/nsys/
+
 # KubeRay config lives in a separate repository
 python/ray/autoscaler/kuberay/config
 

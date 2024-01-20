@@ -231,6 +231,15 @@ _actor_only_options = {
     "max_pending_calls": _counting_option("max_pending_calls", default_value=-1),
     "namespace": Option((str, type(None))),
     "get_if_exists": Option(bool, default_value=False),
+    "bs_range": Option(
+        list,
+        lambda x: None
+        if (isinstance(x, list)
+            and all(isinstance(x_, int) for x_ in x)
+        )
+        else "bs_range must be a range of int of batch size",
+        default_value=[],
+    ),
 }
 
 # Priority is important here because during dictionary update, same key with higher

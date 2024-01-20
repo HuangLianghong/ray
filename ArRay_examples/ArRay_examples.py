@@ -1,7 +1,3 @@
-"""
-Profile different models with different batch size,
-and plot the results.
-"""
 from ray.util.actor_pool import ActorPool
 from torchvision.datasets import CIFAR10
 from torchvision.models import resnet18,resnet152,vgg19,vit_h_14,resnet50,swin_v2_b, swin_v2_s,mobilenet_v3_small
@@ -17,9 +13,9 @@ if __name__ == "__main__":
     ray.init(_temp_dir="/mnt/sda/2022-0526/home/hlh/ray-log-files/")
     model =resnet50()
     model_ref = ray.put(model)
-    batch_sizes = [64,128,256,512,1024,2048,4096]
+    dummy_batch_sizes = 64
     # batch_sizes = [1,2,4,8,16,32]
-    num_actors = len(batch_sizes)
+    num_actors = 1
 
     times=[]
     gpu_utils=[]
@@ -28,7 +24,7 @@ if __name__ == "__main__":
     for i in range(0,num_actors):
         actor = Predictor.remote(model_ref)
         start = time.time()
-        ref = actor.predict.remote("~/data_ArRay",batch_sizes[i])
+        ref = actor.predict.remote("~/data_ArRay",dummy_batch_sizes)
         bs, gpu_util=ray.get(ref)
         end =time.time()
         times.append(end-start)
