@@ -10,13 +10,15 @@ from torch.utils.data import DataLoader, Subset
 from threading import Thread
 
 
-@ray.remote(num_gpus=1,auto_num_gpus=True, bs_range=[1,4])
+@ray.remote(num_gpus=1, auto_num_gpus=True, bs_range=[256,512])
 class Predictor:
+    batch_size=16
+
     def __init__(self, model):
         torch.cuda.is_available()
         self.model = model.to(torch.device("cuda"))
         self.model.eval()
-
+        
         self.transform_test = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -32,6 +34,7 @@ class Predictor:
         """
         This method is used to profile the GPU resources that this actor needs.
         """
+        print(f"profile size:{batch_size}")
         data_dir = "~/data_ArRay"
         data_dir=os.path.expanduser(data_dir)
         os.makedirs(data_dir, exist_ok=True)
@@ -50,7 +53,9 @@ class Predictor:
                 result.append(self.model(X))
 
     
-    def predict(self, data_dir, batch_size):
+    def predict(self,data_dir):
+        print(f"predict batch_size:{self.batch_size}")
+
         data_dir=os.path.expanduser(data_dir)
         os.makedirs(data_dir, exist_ok=True)   
         with FileLock(os.path.join(data_dir, ".ray.lock")):
@@ -59,7 +64,7 @@ class Predictor:
             )
         # validation_loader = DataLoader(validation_dataset, batch_size=batch_size) 
 
-        validation_loader = DataLoader(validation_dataset, batch_size=batch_size)
+        validation_loader = DataLoader(validation_dataset, batch_size=self.batch_size)
 
         result=[]
         
@@ -78,7 +83,7 @@ class Predictor:
         # ...
 
         # Here we just return the size about the result in this example.
-        return batch_size, monitor.gpu_util[2]
+        return monitor.gpu_util[2]
     
 class Monitor(Thread):
 

@@ -698,10 +698,26 @@ class ActorClass:
         """
         require_auto_tune = self._default_options.get("auto_num_gpus")
         if require_auto_tune:
+            if not hasattr(self, "batch_size"):
+                raise TypeError('User should provide default \'batch_size\' as a class variable')
             # for key in kwargs:
             #     print(f"key = {key}, value = {kwargs[key]}")
-            self.auto_configure(args=args, kwargs=kwargs, **self._default_options)
+            new_num_gpus, new_batch_size = self.auto_configure(args=args, kwargs=kwargs, **self._default_options)
+            self._default_options["num_gpus"] = new_num_gpus
+            '''
+            Need to set up new_batch_size for the predict method in actor
+            '''
+            
+            old_batch_size = getattr(self, "batch_size")
+            print(f"self old_batch_size:{old_batch_size}")
 
+            # BUG: self.batch_size in Predictor class do not change
+            # setattr(self,"batch_size",new_batch_size) 
+            # if not hasattr(self, "batch_size"):
+            #     raise TypeError('There is no \'batch_size\'')
+            # ans = getattr(self, "batch_size")
+
+       
         return self._remote(args=args, kwargs=kwargs, **self._default_options)
 
     def options(self, **actor_options):
@@ -887,7 +903,8 @@ class ActorClass:
             """
             For gpu_utils[i][j], j is the actual index of physical GPU
             """
-            duration_vs_gpuutil.append(duration_times[i]/(1/gpu_utils[i][2]))
+            if gpu_utils[i][2] != 0:
+                duration_vs_gpuutil.append(duration_times[i]/(1/gpu_utils[i][2]))
         
         min_idx = duration_vs_gpuutil.index(min(duration_vs_gpuutil))
         best_batch_size = batch_sizes[min_idx]
@@ -919,7 +936,12 @@ class ActorClass:
         # batch_sizes = [1,2,4,8,16,32,64,128,256,512]
         # print(f"start batch size:{bs_range[0]}")
         # print(f"end batch size:{bs_range[1]}")
+        
+        if len(bs_range) != 2 or bs_range[0]>bs_range[1]:
+            raise TypeError("bs_range must have and only have two elements."
+                            "And the former element cannot be larger than the latter one.")
         batch_sizes = self.generate_powers_of_two(bs_range[0], bs_range[1])
+
         print(f"Batch sizes for profiling:{batch_sizes}")
         # batch_sizes = [1,32,64,128]
         duration_times = []
@@ -932,10 +954,11 @@ class ActorClass:
             gpu_utils.append(avg_gpu_util)
 
         new_num_gpus, new_batch_size = self.calculate_num_gpus(gpu_utils, duration_times, batch_sizes)
+        return new_num_gpus, new_batch_size
 
     @wrap_auto_init
     @_tracing_actor_creation
-    def _remote(self, args=None, kwargs=None, **actor_options):
+    def _remote(self, args=None, kwargs=None, **actor_options):       
         """Create an actor.
 
         This method allows more flexibility than the remote method because
@@ -1284,6 +1307,7 @@ class ActorClass:
         )
 
         return actor_handle
+
 
     @DeveloperAPI
     def bind(self, *args, **kwargs):
@@ -1713,6 +1737,11 @@ def _modify_class(cls):
 
 def _make_actor(cls, actor_options):
     Class = _modify_class(cls)
+    # ans = getattr(Class, "batch_size")
+    # print(f"self new_batch_size:{ans}")
+    # NOTE: Change batch_size in here
+    # setattr(Class,"batch_size",512)
+
     _inject_tracing_into_class(Class)
 
     if "max_restarts" in actor_options:
